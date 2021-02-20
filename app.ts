@@ -6,49 +6,76 @@ import m3u8stream from 'm3u8stream';
 import readline from 'readline';
 import { exit, stdin, stdout } from 'process';
 
-let sortCountry = 'us';
+let sortCountry = 'bt';
 
 const rl = readline.createInterface({
   input: stdin,
   output: stdout,
 });
 
+function writeToFile(sortedChannels: Channel[], workingChannels: Channel[]) {
+  fs.writeFileSync(
+    path.join(__dirname, 'out', `${sortCountry}-sorted.json`),
+    JSON.stringify(workingChannels, null, 2)
+  );
+  console.log(
+    `Sorting Completed ${sortCountry}-sorted.json created in the out folder`
+  );
+  console.log(
+    `${workingChannels.length} channel(s) were found working out of ${sortedChannels.length}`
+  );
+  exit();
+}
+
 function main() {
   fs.readFile(path.join(__dirname, 'channels.json'), (err, data) => {
     const channels: Channel[] = JSON.parse(data.toString());
     const sortedChannels = sortByCountryCode(sortCountry, channels);
     const workingChannels: Channel[] = [];
-    sortedChannels.forEach((channel, index) => {
+    const httpChannels = sortedChannels.reduce((prev, current) => {
       if (
-        channel.url &&
-        (channel.url.startsWith('https://') ||
-          channel.url.startsWith('http://'))
+        current.url &&
+        (current.url.startsWith('https://') ||
+          current.url.startsWith('http://'))
       ) {
-        const stream = m3u8stream(channel.url);
-        stream
-          .on('data', chunk => {
-            if (chunk) {
-              workingChannels.push(channel);
-              if (index + 1 === sortedChannels.length) {
-                fs.writeFileSync(
-                  path.join(__dirname, 'out', `${sortCountry}-sorted.json`),
-                  JSON.stringify(sortedChannels, null, 2)
-                );
-              }
-              stream.destroy();
-            } else {
-              setTimeout(() => {
-                stream.destroy();
-              }, 10000);
-            }
-          })
-          .on('error', () => {
-            console.log('A bad link was discarded');
-          })
-          .on('close', () => {
-            console.log('Sorting Completed');
-          });
+        prev.push(current);
       }
+
+      return prev;
+    }, [] as Channel[]);
+
+    let currentLink = 0;
+    httpChannels.forEach((channel, index) => {
+      console.log(index);
+      const stream = m3u8stream(channel.url!);
+      stream
+        .on('data', chunk => {
+          ++currentLink;
+
+          if (chunk) {
+            workingChannels.push(channel);
+            if (index + 1 === httpChannels.length) {
+              writeToFile(httpChannels, workingChannels);
+            }
+          }
+          stream.destroy();
+        })
+        .on('error', err => {
+          ++currentLink;
+          console.log(`A bad link was discarded ${index}-${channel.name}`);
+          if (currentLink === httpChannels.length) {
+            writeToFile(httpChannels, workingChannels);
+          }
+        })
+        .on('close', () => {
+          console.log(
+            `Marked as working. ${index} / ${sortedChannels.length} `
+          );
+          console.log(currentLink);
+          if (currentLink === httpChannels.length) {
+            writeToFile(httpChannels, workingChannels);
+          }
+        });
     });
 
     // writeFileSync(
@@ -58,7 +85,7 @@ function main() {
   });
 }
 
-rl.question('select a country or press x to exit', answer => {
+rl.question('select a country or press x to exit: \n', answer => {
   if (answer.toLowerCase() === 'x') exit();
   sortCountry = answer;
   main();
