@@ -13,6 +13,20 @@ const rl = readline.createInterface({
   output: stdout,
 });
 
+function writeToFile(sortedChannels: Channel[], workingChannels: Channel[]) {
+  fs.writeFileSync(
+    path.join(__dirname, 'out', `${sortCountry}-sorted.json`),
+    JSON.stringify(sortedChannels, null, 2)
+  );
+  console.log(
+    `Sorting Completed ${sortCountry}-sorted.json created in the out folder`
+  );
+  console.log(
+    `${workingChannels.length} channel(s) were found working out of ${sortedChannels.length}`
+  );
+  exit();
+}
+
 function main() {
   fs.readFile(path.join(__dirname, 'channels.json'), (err, data) => {
     const channels: Channel[] = JSON.parse(data.toString());
@@ -24,29 +38,37 @@ function main() {
         (channel.url.startsWith('https://') ||
           channel.url.startsWith('http://'))
       ) {
+        console.log(index);
         const stream = m3u8stream(channel.url);
         stream
           .on('data', chunk => {
             if (chunk) {
               workingChannels.push(channel);
               if (index + 1 === sortedChannels.length) {
-                fs.writeFileSync(
-                  path.join(__dirname, 'out', `${sortCountry}-sorted.json`),
-                  JSON.stringify(sortedChannels, null, 2)
-                );
+                writeToFile(sortedChannels, workingChannels);
               }
               stream.destroy();
             } else {
-              setTimeout(() => {
-                stream.destroy();
-              }, 10000);
+              stream.destroy();
             }
           })
-          .on('error', () => {
-            console.log('A bad link was discarded');
+          .on('error', err => {
+            console.log(`A bad link was discarded ${index}-${channel.name}`);
+            if (err) {
+              if (index + 1 === sortedChannels.length) {
+                writeToFile(sortedChannels, workingChannels);
+              }
+            }
           })
-          .on('close', () => {
-            console.log('Sorting Completed');
+          .on('close', res => {
+            console.log(
+              `Marked as working. ${index} / ${sortedChannels.length} `
+            );
+            if (res) {
+              if (index + 1 === sortedChannels.length) {
+                writeToFile(sortedChannels, workingChannels);
+              }
+            }
           });
       }
     });
@@ -58,7 +80,7 @@ function main() {
   });
 }
 
-rl.question('select a country or press x to exit', answer => {
+rl.question('select a country or press x to exit: \n', answer => {
   if (answer.toLowerCase() === 'x') exit();
   sortCountry = answer;
   main();
