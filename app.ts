@@ -3,45 +3,67 @@ import path from 'path';
 import { Channel } from './models/Channel';
 import fetch from 'node-fetch';
 import m3u8stream from 'm3u8stream';
+import readline from 'readline';
+import { exit, stdin, stdout } from 'process';
 
-const sortCountry = 'us';
+let sortCountry = 'us';
 
-fs.readFile(path.join(__dirname, 'channels.json'), (err, data) => {
-  const channels: Channel[] = JSON.parse(data.toString());
-  const sortedChannels = sortByCountryCode(sortCountry, channels);
-  const workingChannels: Channel[] = [];
-  sortedChannels.forEach((channel, index) => {
-    if (
-      channel.url &&
-      (channel.url.startsWith('https://') || channel.url.startsWith('http://'))
-    ) {
-      const stream = m3u8stream(channel.url);
-      stream
-        .on('data', chunk => {
-          if (chunk) {
-            workingChannels.push(channel);
-            if (index + 1 === sortedChannels.length) {
-              fs.writeFileSync(
-                path.join(__dirname, 'out', `${sortCountry}-sorted.json`),
-                JSON.stringify(sortedChannels, null, 2)
-              );
-            }
-            stream.destroy();
-          } else {
-            setTimeout(() => {
+const rl = readline.createInterface({
+  input: stdin,
+  output: stdout,
+});
+
+function main() {
+  fs.readFile(path.join(__dirname, 'channels.json'), (err, data) => {
+    const channels: Channel[] = JSON.parse(data.toString());
+    const sortedChannels = sortByCountryCode(sortCountry, channels);
+    const workingChannels: Channel[] = [];
+    sortedChannels.forEach((channel, index) => {
+      if (
+        channel.url &&
+        (channel.url.startsWith('https://') ||
+          channel.url.startsWith('http://'))
+      ) {
+        const stream = m3u8stream(channel.url);
+        stream
+          .on('data', chunk => {
+            if (chunk) {
+              workingChannels.push(channel);
+              if (index + 1 === sortedChannels.length) {
+                fs.writeFileSync(
+                  path.join(__dirname, 'out', `${sortCountry}-sorted.json`),
+                  JSON.stringify(sortedChannels, null, 2)
+                );
+              }
               stream.destroy();
-            }, 10000);
-          }
-        })
-        .on('error', () => {})
-        .on('close', () => {});
-    }
-  });
+            } else {
+              setTimeout(() => {
+                stream.destroy();
+              }, 10000);
+            }
+          })
+          .on('error', () => {
+            console.log('A bad link was discarded');
+          })
+          .on('close', () => {
+            console.log('Sorting Completed');
+          });
+      }
+    });
 
-  // writeFileSync(
-  //   path.join(__dirname, 'out', `${sortCountry}.json`),
-  //   JSON.stringify(sortedChannels, null, 2)
-  // );
+    // writeFileSync(
+    //   path.join(__dirname, 'out', `${sortCountry}.json`),
+    //   JSON.stringify(sortedChannels, null, 2)
+    // );
+  });
+}
+
+rl.question('select a country or press x to exit', answer => {
+  if (answer.toLowerCase() === 'x') exit();
+  sortCountry = answer;
+  main();
+
+  rl.close();
 });
 
 function sortByCountryCode(countryCode: string, channels: Channel[]) {
