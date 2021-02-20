@@ -4,12 +4,24 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon app.ts"
+    "start": "nodemon app.ts",
+    "open": "explorer ."
+  },
+  "nodemonConfig": {
+    "ignore": [
+      "out/*.json",
+      "out\\*.json"
+    ]
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^14.14.31"
+    "@types/node": "^14.14.31",
+    "@types/node-fetch": "^2.5.8"
+  },
+  "dependencies": {
+    "m3u8stream": "^0.8.3",
+    "node-fetch": "^2.6.1"
   }
 }

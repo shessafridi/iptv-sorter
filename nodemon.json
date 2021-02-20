@@ -1,0 +1,3 @@
+{
+  "ignore": ["out/*.json", "out\\*.json", "temp", "temp\\*", "README"]
+}
