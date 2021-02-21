@@ -6,6 +6,7 @@ export interface Channel {
   languages: Language[];
   countries: Country[];
   tvg: Tvg[];
+  [x: string]: any;
 }
 
 interface Tvg {
